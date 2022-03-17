@@ -1,31 +1,40 @@
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import './styles/app.css'
 import PostList from "./components/PostList";
 import PostForm from "./components/PostForm";
 import PostFilter from "./components/PostFilter";
 import MyModal from "./components/UI/MyModal/MyModal";
 import MyButton from "./components/UI/button/MyButton";
+import {usePosts} from "./hooks/usePosts";
+import PostService from "./API/PostService";
+import Loader from "./components/UI/loader/Loader";
+import {useFetching} from "./hooks/useFetching";
+import {getPageCount, getPagesArr} from "./utils/pages";
 
 function App() {
 
-	const [posts, setPosts] = useState([
-		{id: 1, title: 'aa', body: 'zz'},
-		{id: 2, title: 'ff 1', body: 'ww'},
-		{id: 3, title: 'vv', body: 'aa'}
-	]);
+	const [posts, setPosts] = useState([]);
 	const [filter, setFilter] = useState({sort: '', query: ''});
 	const [modal, setModal] = useState(false);
+	const [totalPages, setTotalPages] = useState(0);
+	const [limit, setLimit] = useState(10);
+	const [page, setPage] = useState(1);
+	const sortedAndSearchedPosts = usePosts(posts, filter.sort, filter.query);
+	let pagesArr = getPagesArr(totalPages);
 
-	const sortedPosts = useMemo(() => {
-		if (filter.sort) {
-			return [...posts].sort((a, b) => a[filter.sort].localeCompare(b[filter.sort]));
-		}
-		return posts;
-	}, [filter.sort, posts])
 
-	const sortedAndSearchedPosts = useMemo(() => {
-		return sortedPosts.filter(post => post.title.toLowerCase().includes(filter.query.toLowerCase()));
-	}, [filter.query, sortedPosts])
+	const [fetchPosts, isPostsLoading, postError] = useFetching(async (limit, page) => {
+		const response = await PostService.getAll(limit, page);
+		setPosts(response.data);
+		const totalCount = response.headers['x-total-count'];
+		setTotalPages(getPageCount(totalCount, limit));
+	})
+
+
+	useEffect(() => {
+		fetchPosts(limit, page);
+	}, []);
+
 
 	const createPost = (newPost) => {
 		setPosts([...posts, newPost]);
@@ -38,6 +47,11 @@ function App() {
 	//Получаю пост из дочернего компонента
 	const removePost = (post) => {
 		setPosts(posts.filter(delPost => delPost.id !== post.id))
+	}
+
+	const changePage = (page) => {
+		setPage(page);
+		fetchPosts(limit, page);
 	}
 
 	return (
@@ -53,7 +67,22 @@ function App() {
 				filter={filter}
 				setFilter={setFilter}
 			/>
-				<PostList remove={removePost}posts={sortedAndSearchedPosts} title='Посты про JS'/>
+			{postError &&
+			<h1>Произошла ошибка ${postError}</h1>}
+			{isPostsLoading
+				? <div style={{display: 'flex', justifyContent: 'center', marginTop: 50}}><Loader/></div>
+				: <PostList remove={removePost}posts={sortedAndSearchedPosts} title='Посты про JS'/>
+			}
+			<div className='page__wrapper'>
+				{pagesArr.map(p =>
+					<span
+						onClick={() => changePage(p)}
+						key={p}
+						className={
+						page === p ? 'page page__current' : 'page'
+					}>{p}</span>
+				)}
+			</div>
 		</div>
 	);
 }
