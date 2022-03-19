@@ -1,5 +1,6 @@
 {
-  "name": "test-rep",
+  "name": "react-posts",
+  "homepage": "https://nikgosu.github.io/React-posts",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
